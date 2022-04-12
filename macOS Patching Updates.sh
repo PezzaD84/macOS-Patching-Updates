@@ -16,6 +16,24 @@ Notify=/Library/Application\ Support/JAMF/bin/jamfHelper.app/Contents/MacOS/jamf
 
 processor=$(uname -m)
 
+min_drive_space=45
+
+free_disk_space=$(osascript -l 'JavaScript' -e "ObjC.import('Foundation'); var freeSpaceBytesRef=Ref(); $.NSURL.fileURLWithPath('/').getResourceValueForKeyError(freeSpaceBytesRef, 'NSURLVolumeAvailableCapacityForImportantUsageKey', null); Math.round(ObjC.unwrap(freeSpaceBytesRef[0]) / 1000000000)")  # with thanks to Pico
+
+# Free space check
+
+if [[ ! "$free_disk_space" ]]; then
+	# fall back to df -h if the above fails
+	free_disk_space=$(df -Pk . | column -t | sed 1d | awk '{print $4}')
+fi
+
+if [[ $free_disk_space -ge $min_drive_space ]]; then
+	echo "OK - $free_disk_space GB free/purgeable disk space detected"
+else
+	echo "ERROR - $free_disk_space GB free/purgeable disk space detected"
+	exit 1
+fi
+
 # Run software update
 
 if [[ $processor == arm64 ]]; then
