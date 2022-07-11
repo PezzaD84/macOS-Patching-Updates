@@ -49,17 +49,26 @@ if [[ $processor == arm64 ]]; then
 	
 	sleep 5
 	
-"$Notify" \
--windowType hud \
--lockHUD \
--title "MacOS Updates" \
--heading "MacOS Updates Installing" \
--description "MacOS updates are now being installed.
-This process can take 20-40min so please do not turn off your device during this time.
-Once the update is downloaded and ready to install please click on Restart Now." \
--icon /System/Library/PreferencePanes/SoftwareUpdate.prefPane/Contents/Resources/SoftwareUpdate.icns \
--button1 "Ok" \
--defaultButton 1 \
+SUPending=$(log show --predicate '(subsystem == "com.apple.SoftwareUpdateMacController") && (eventMessage CONTAINS[c] "reported progress (end): phase:PREPARED")' | grep phase:PREPARED)
+	
+	while [[ $SUPending == '' ]]; do
+		echo "Updates downloading....."
+		
+		SUPending=$(log show --predicate '(subsystem == "com.apple.SoftwareUpdateMacController") && (eventMessage CONTAINS[c] "reported progress (end): phase:PREPARED")' | grep phase:PREPARED)
+		sleep 20
+	done
+	
+	echo "Pending Updates require a reboot"
+	"$Notify" \
+	-windowType hud \
+	-lockHUD \
+	-title "MacOS Updates" \
+	-heading "MacOS Updates Pending" \
+	-description "MacOS updates are pending a reboot.
+This process can take 20-40min so please save your work and then click on Ok." \
+	-icon /System/Library/PreferencePanes/SoftwareUpdate.prefPane/Contents/Resources/SoftwareUpdate.icns \
+	-button1 "Ok" \
+	-defaultButton 1
 	
 	open -b com.apple.systempreferences /System/Library/PreferencePanes/SoftwareUpdate.prefPane/
 else
