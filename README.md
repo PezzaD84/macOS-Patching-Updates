@@ -2,6 +2,8 @@
 
 Bash script for managing monthly security and feature updates on Intel and M1 macs. This script has no deferal options like the original larger macOS patching script. This script is designed to be be triggered off monthly or weekly in Jamf without casuing to much disruption for the end users.
 
+Update: A 4 day deferment has been added to the update script now. Users now have the ability to defer/postpone updates for 4 days and then the updates will be forced to install. You can switch this off by hashing out or removing line 103
+
 # Intel mac patching
 
 The intel mac patching is triggered using the built in softwareupdates command and installs all the latest recommended and important updates and then triggers an automatic reboot if needed.
