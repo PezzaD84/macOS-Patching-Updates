@@ -34,6 +34,74 @@ else
 	exit 1
 fi
 
+# Deferment notification
+
+day1=/var/tmp/postponed.txt
+day2=/var/tmp/postponed2.txt
+day3=/var/tmp/postponed3.txt
+day4=/var/tmp/postponed4.txt
+
+deferment(){
+message=$("$Notify" \
+-windowType hud \
+-lockHUD \
+-title "MacOS Updates" \
+-heading "MacOS Updates Available" \
+-description "MacOS updates are available to install.
+This process can take 20-40min so please do not turn off your device during this time.
+Your device will reboot by itself once completed." \
+-icon /System/Library/PreferencePanes/SoftwareUpdate.prefPane/Contents/Resources/SoftwareUpdate.icns \
+-button1 "Install now" \
+-button2 "Postpone" \
+-defaultButton 1 \
+)
+
+if [[ $message == 0 ]]; then
+	echo "User agreed to install macOS updates"
+	rm $day1
+	rm $day2
+	rm $day3
+	rm $day4
+elif [[ ! -f $day1 ]]; then
+	echo "User postponed the macOS updates 1st Day" > $day1
+	echo "User postponed the macOS updates 1st Day"
+	exit 0
+elif [[ -f $day1 ]] && [[ ! -f $day2 ]]; then
+	echo "User postponed the macOS updates 2nd Day" > $day2
+	echo "User postponed the macOS updates 2nd Day"
+	exit 0
+elif [[ -f $day1 ]] && [[ -f $day2 ]] && [[ ! -f $day3 ]]; then
+	echo "User postponed the macOS updates 3rd Day" > $day3
+	echo "User postponed the macOS updates 3rd Day"
+	exit 0
+elif [[ -f $day1 ]] && [[ -f $day2 ]] && [[ -f $day3 ]] && [[ ! -f $day4 ]]; then
+	echo "User postponed the macOS updates 4th Day" > $day4
+	echo "User postponed the macOS updates 4th Day"
+	exit 0
+elif [[ -f $day4 ]]; then
+	message=$("$Notify" \
+-windowType hud \
+-lockHUD \
+-title "MacOS Updates" \
+-heading "MacOS Updates Available" \
+-description "Update postponement has passed 4 days.
+Your device will now be updated.
+
+This process can take 20-40min so please do not turn off your device during this time.
+Your device will reboot by itself once completed." \
+-icon /System/Library/PreferencePanes/SoftwareUpdate.prefPane/Contents/Resources/SoftwareUpdate.icns \
+-button1 "Install now" \
+-defaultButton 1 \
+)
+	rm $day1
+	rm $day2
+	rm $day3
+	rm $day4
+fi
+}
+
+deferment
+
 # Run software update
 
 if [[ $processor == arm64 ]]; then
