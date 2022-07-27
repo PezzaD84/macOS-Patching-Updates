@@ -108,6 +108,7 @@ if [[ $processor == arm64 ]]; then
 	echo "Mac is M1"
    
 	open -b com.apple.systempreferences /System/Library/PreferencePanes/SoftwareUpdate.prefPane/ --hide
+	sudo launchctl kickstart -k system/com.apple.softwareupdated
    
 	sleep 10
 	
