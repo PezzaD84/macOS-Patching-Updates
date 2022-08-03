@@ -1,0 +1,7 @@
+3/8/2022
+# - API Credentials updated
+    The use of encrypted bearer tokens has been added to the update script.
+
+Update:
+# - A 4 day deferment has been added to the update script now. 
+    Users now have the ability to defer/postpone updates for 4 days and then the updates will be forced to install. You can switch this off by hashing out or removing line 103
