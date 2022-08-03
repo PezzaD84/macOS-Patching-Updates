@@ -4,9 +4,8 @@
 #
 # Script to update macOS
 #
-# $4 = API Username
-# $5 = API Password
-# $6 = JSS URL
+# $4 = JSS URL
+# $5 = Encrypted API creds
 #
 #################################################################
 
@@ -79,7 +78,8 @@ elif [[ -f $day1 ]] && [[ -f $day2 ]] && [[ -f $day3 ]] && [[ ! -f $day4 ]]; the
 	echo "User postponed the macOS updates 4th Day"
 	exit 0
 elif [[ -f $day4 ]]; then
-	message=$("$Notify" \
+
+message=$("$Notify" \
 -windowType hud \
 -lockHUD \
 -title "MacOS Updates" \
@@ -112,9 +112,13 @@ if [[ $processor == arm64 ]]; then
    
 	sleep 10
 	
+	# API Credentials
+	encryptedcreds="$5"
+
+	token=$(curl -s -H "Content-Type: application/json" -H "Authorization: Basic ${encryptedcreds}" -X POST "$4/api/v1/auth/token" | grep 'token' | tr -d '"',',' | sed -e 's#token :##' | xargs)
 	serial=$(system_profiler SPHardwareDataType | awk '/Serial Number/{print $4}')
-	ID=$(curl -u $4:$5 -X GET "https://$6/JSSResource/computers/serialnumber/$serial" | tr '<' '\n' | grep -m 1 id | tr -d 'id>')
-	curl -u $4:$5 -X POST "https://$6/JSSResource/computercommands/command/ScheduleOSUpdate/action/InstallForceRestart/id/$ID"
+	ID=$(curl -X GET "$4/JSSResource/computers/serialnumber/$serial" -H "Accept: application/json" -H "Authorization:Bearer ${token}" | tr '<' '\n' | grep -m 1 id | tr -d 'id>')
+	curl -X POST "$4/JSSResource/computercommands/command/ScheduleOSUpdate/action/InstallForceRestart/id/$ID" -H "Accept: application/json" -H "Authorization:Bearer ${token}"
 	
 	sleep 5
 	
