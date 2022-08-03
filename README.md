@@ -12,13 +12,8 @@ The intel mac patching is triggered using the built in softwareupdates command a
 
 M1 devices are triggered using the Jamf API. In Jamf you will need to specify the following variables for your instance.
 
-$4 = API Username
+$4 = JSS URL
 
-$5 = API Password
-
-$6 = JSS URL
-
-(The script will be updated for the modern API later)
+$5 = Encrypted API Credentials
 
 The script will trigger the ScheduleOSUpdate MDM command. The user will be prompted to reboot their device once the updates have been downloaded and are ready to install.
-
