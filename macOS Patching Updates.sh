@@ -117,7 +117,7 @@ if [[ $processor == arm64 ]]; then
 
 	token=$(curl -s -H "Content-Type: application/json" -H "Authorization: Basic ${encryptedcreds}" -X POST "$4/api/v1/auth/token" | grep 'token' | tr -d '"',',' | sed -e 's#token :##' | xargs)
 	serial=$(system_profiler SPHardwareDataType | awk '/Serial Number/{print $4}')
-	ID=$(curl -X GET "$4/JSSResource/computers/serialnumber/$serial" -H "Accept: application/json" -H "Authorization:Bearer ${token}" | tr '<' '\n' | grep -m 1 id | tr -d 'id>')
+	ID=$(curl -X GET "$4/JSSResource/computers/serialnumber/$serial" -H "Accept: application/xml" -H "Authorization:Bearer ${token}" | tr '<' '\n' | grep -m 1 id | tr -d 'id>')
 	curl -X POST "$4/JSSResource/computercommands/command/ScheduleOSUpdate/action/InstallForceRestart/id/$ID" -H "Accept: application/json" -H "Authorization:Bearer ${token}"
 	
 	sleep 5
