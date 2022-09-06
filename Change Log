@@ -5,3 +5,13 @@
 Update:
 # - A 4 day deferment has been added to the update script now. 
     Users now have the ability to defer/postpone updates for 4 days and then the updates will be forced to install. You can switch this off by hashing out or removing line 103
+
+6/9/2022
+# - API Update Command removed
+    The use of the Jamf API Update command has been removed due to being very hit and miss and lacking control.
+    
+# - Updates run from SoftwareUpdate Command
+    Updates are now run locally from the SoftwareUpdate command on both M1 and Intel macs.
+    
+# - Admin elevation
+    Users of M1 devices are elevated to Admin to run updates (if they are not) and then demoted to standard once updates are installed.
