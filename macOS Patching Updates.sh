@@ -4,22 +4,40 @@
 #
 # Script to update macOS
 #
-# $4 = JSS URL
-# $5 = Encrypted API creds
-#
 #################################################################
 
+##############################################################
 # Variables
+##############################################################
 
 Notify=/Library/Application\ Support/JAMF/bin/jamfHelper.app/Contents/MacOS/jamfHelper
 
 processor=$(uname -m)
 
+CURRENT_USER=$(ls -l /dev/console | awk '{ print $3 }')
+
 min_drive_space=45
 
 free_disk_space=$(osascript -l 'JavaScript' -e "ObjC.import('Foundation'); var freeSpaceBytesRef=Ref(); $.NSURL.fileURLWithPath('/').getResourceValueForKeyError(freeSpaceBytesRef, 'NSURLVolumeAvailableCapacityForImportantUsageKey', null); Math.round(ObjC.unwrap(freeSpaceBytesRef[0]) / 1000000000)")  # with thanks to Pico
 
+elevate(){
+	# Check user has Securetoken
+	token=$(sudo dscl . -read /Users/$CURRENT_USER AuthenticationAuthority | grep -o 'SecureToken')
+	
+	if [[ $token == SecureToken ]]; then
+		echo "$CURRENT_USER has a secure token. Continuing to elevate user."
+	else
+		echo "$CURRENT_USER does not have a secure token. A local admin will be needed to run upgrades."
+	fi
+	
+	# Elevate user account
+	dscl . -append /groups/admin GroupMembership $CURRENT_USER
+	
+}
+
+##############################################################
 # Free space check
+##############################################################
 
 if [[ ! "$free_disk_space" ]]; then
 	# fall back to df -h if the above fails
@@ -33,7 +51,9 @@ else
 	exit 1
 fi
 
+##############################################################
 # Deferment notification
+##############################################################
 
 day1=/var/tmp/postponed.txt
 day2=/var/tmp/postponed2.txt
@@ -47,7 +67,7 @@ message=$("$Notify" \
 -title "MacOS Updates" \
 -heading "MacOS Updates Available" \
 -description "MacOS updates are available to install.
-This process can take 20-40min so please do not turn off your device during this time.
+This process can take 20-60min so please do not turn off your device during this time.
 Your device will reboot by itself once completed." \
 -icon /System/Library/PreferencePanes/SoftwareUpdate.prefPane/Contents/Resources/SoftwareUpdate.icns \
 -button1 "Install now" \
@@ -87,7 +107,7 @@ message=$("$Notify" \
 -description "Update postponement has passed 4 days.
 Your device will now be updated.
 
-This process can take 20-40min so please do not turn off your device during this time.
+This process can take 20-60min so please do not turn off your device during this time.
 Your device will reboot by itself once completed." \
 -icon /System/Library/PreferencePanes/SoftwareUpdate.prefPane/Contents/Resources/SoftwareUpdate.icns \
 -button1 "Install now" \
@@ -102,48 +122,108 @@ fi
 
 deferment
 
+##############################################################
 # Run software update
+##############################################################
 
 if [[ $processor == arm64 ]]; then
 	echo "Mac is M1"
-   
-	open -b com.apple.systempreferences /System/Library/PreferencePanes/SoftwareUpdate.prefPane/ --hide
-	sudo launchctl kickstart -k system/com.apple.softwareupdated
-   
-	sleep 10
+	launchctl kickstart -k system/com.apple.softwareupdated
 	
-	# API Credentials
-	encryptedcreds="$5"
-
-	token=$(curl -s -H "Content-Type: application/json" -H "Authorization: Basic ${encryptedcreds}" -X POST "$4/api/v1/auth/token" | grep 'token' | tr -d '"',',' | sed -e 's#token :##' | xargs)
-	serial=$(system_profiler SPHardwareDataType | awk '/Serial Number/{print $4}')
-	ID=$(curl -X GET "$4/JSSResource/computers/serialnumber/$serial" -H "Accept: application/xml" -H "Authorization:Bearer ${token}" | tr '<' '\n' | grep -m 1 id | tr -d 'id>')
-	curl -X POST "$4/JSSResource/computercommands/command/ScheduleOSUpdate/action/InstallForceRestart/id/$ID" -H "Accept: application/json" -H "Authorization:Bearer ${token}"
-	
-	sleep 5
-	
-SUPending=$(log show --predicate '(subsystem == "com.apple.SoftwareUpdateMacController") && (eventMessage CONTAINS[c] "reported progress (end): phase:PREPARED")' | grep phase:PREPARED)
-	
-	while [[ $SUPending == '' ]]; do
-		echo "Updates downloading....."
+	if dscl . read /Groups/admin | grep $CURRENT_USER; then
+		echo "$CURRENT_USER is admin. Checking Secure Token status....."
 		
-		SUPending=$(log show --predicate '(subsystem == "com.apple.SoftwareUpdateMacController") && (eventMessage CONTAINS[c] "reported progress (end): phase:PREPARED")' | grep phase:PREPARED)
-		sleep 20
-	done
-	
-	echo "Pending Updates require a reboot"
+		token=$(sudo dscl . -read /Users/$CURRENT_USER AuthenticationAuthority | grep -o 'SecureToken')
+		if [[ $token == SecureToken ]]; then
+			echo "$CURRENT_USER has a secure token. Continuing updates....."
+		else
+			echo "$CURRENT_USER does not have a secure token. A local admin will be needed to run upgrades."
+			"$Notify" \
+			-windowType hud \
+			-lockHUD \
+			-title "MacOS Updates" \
+			-heading "MacOS Update Error" \
+			-description "MacOS Updates cannot be installed.
+The user account does not have a secure token. Please contact your administrator." \
+			-icon /System/Library/PreferencePanes/SoftwareUpdate.prefPane/Contents/Resources/SoftwareUpdate.icns \
+			-button1 "Ok" \
+			-defaultButton 1 \
+			exit 1
+		fi
+	else
+		echo "$CURRENT_USER is not admin"
+		elevate
+		
+		# Create plist to remove admin at next login
+		
+		# Create directory and removal script 
+		
+		mkdir -p /Library/.TRAMS/Scripts/
+		
+		cat << EOF > /Library/.TRAMS/Scripts/RemoveAdmin.sh
+#!/bin/bash
+
+dseditgroup -o edit -d $user -t user admin
+EOF
+		
+		chown root:wheel /Library/.TRAMS/Scripts/RemoveAdmin.sh
+		chmod 755 /Library/.TRAMS/Scripts/RemoveAdmin.sh
+		
+		# Create plist to remove admin at next login
+		
+		cat << EOF > /Library/LaunchDaemons/com.Trams.adminremove.plist
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>com.Trams.adminremove</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>/Library/.TRAMS/Scripts/RemoveAdmin.sh</string>
+	</array>
+	<key>RunAtLoad</key> 
+	<true/>
+</dict>
+</plist>
+EOF
+		
+		# Permission plist
+		chown root:wheel /Library/LaunchDaemons/com.Trams.adminremove.plist
+		chmod 644 /Library/LaunchDaemons/com.Trams.adminremove.plist
+		
+		# Check secure token status
+		
+		token=$(sudo dscl . -read /Users/$CURRENT_USER AuthenticationAuthority | grep -o 'SecureToken')
+		if [[ $token == SecureToken ]]; then
+			echo "$CURRENT_USER has a secure token. Continuing updates....."
+		else
+			echo "$CURRENT_USER does not have a secure token. A local admin will be needed to run upgrades."
+			"$Notify" \
+			-windowType hud \
+			-lockHUD \
+			-title "MacOS Updates" \
+			-heading "MacOS Update Error" \
+			-description "MacOS Updates cannot be installed.
+The user account does not have a secure token. Please contact your administrator." \
+			-icon /System/Library/PreferencePanes/SoftwareUpdate.prefPane/Contents/Resources/SoftwareUpdate.icns \
+			-button1 "Ok" \
+			-defaultButton 1 \
+			exit 1
+		fi
+	fi
+
 	"$Notify" \
 	-windowType hud \
 	-lockHUD \
 	-title "MacOS Updates" \
-	-heading "MacOS Updates Pending" \
-	-description "MacOS updates are pending a reboot.
-This process can take 20-40min so please save your work and then click on Ok." \
-	-icon /System/Library/PreferencePanes/SoftwareUpdate.prefPane/Contents/Resources/SoftwareUpdate.icns \
-	-button1 "Ok" \
-	-defaultButton 1
+	-heading "MacOS Updates Installing" \
+	-description "MacOS updates are now being installed.
+This process can take 20-60min so please do not turn off your device during this time.
+Once the update is downloaded and ready to install your device will reboot so please save any open work." \
+	-icon /System/Library/PreferencePanes/SoftwareUpdate.prefPane/Contents/Resources/SoftwareUpdate.icns &
 	
-	open -b com.apple.systempreferences /System/Library/PreferencePanes/SoftwareUpdate.prefPane/
+	softwareupdate --install --all --agree-to-license --restart --force --user "$CURRENT_USER" --stdinpass "$adminPswd" &
 else
 	echo "Mac is Intel"
 	
@@ -153,11 +233,9 @@ else
 	-title "MacOS Updates" \
 	-heading "MacOS Updates Installing" \
 	-description "MacOS updates are now being installed.
-This process can take 20-40min so please do not turn off your device during this time.
+This process can take 20-60min so please do not turn off your device during this time.
 Once the update is downloaded and ready to install your device will reboot so please save any open work." \
-	-icon /System/Library/PreferencePanes/SoftwareUpdate.prefPane/Contents/Resources/SoftwareUpdate.icns \
-	-button1 "Ok" \
-	-defaultButton 1 \
+	-icon /System/Library/PreferencePanes/SoftwareUpdate.prefPane/Contents/Resources/SoftwareUpdate.icns &
 	
-	sudo softwareupdate -i -r --restart --agree-to-license
+	softwareupdate --install --all --agree-to-license --restart --force &
 fi
