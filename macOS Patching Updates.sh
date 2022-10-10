@@ -212,6 +212,8 @@ The user account does not have a secure token. Please contact your administrator
 			exit 1
 		fi
 	fi
+	
+	adminpswd=$(osascript -e 'Tell application "System Events" to display dialog "To install the available macOS updates please enter your password" buttons {"Continue"} default button 1 with title "macOS Updates" with icon alias "System:Applications:Utilities:Keychain Access.app:Contents:Resources:AppIcon.icns" with hidden answer default answer ""' -e 'text returned of result' 2>/dev/null)
 
 	"$Notify" \
 	-windowType hud \
