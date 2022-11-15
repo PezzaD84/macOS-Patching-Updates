@@ -16,7 +16,7 @@ processor=$(uname -m)
 
 CURRENT_USER=$(ls -l /dev/console | awk '{ print $3 }')
 
-min_drive_space=45
+min_drive_space=10
 
 free_disk_space=$(osascript -l 'JavaScript' -e "ObjC.import('Foundation'); var freeSpaceBytesRef=Ref(); $.NSURL.fileURLWithPath('/').getResourceValueForKeyError(freeSpaceBytesRef, 'NSURLVolumeAvailableCapacityForImportantUsageKey', null); Math.round(ObjC.unwrap(freeSpaceBytesRef[0]) / 1000000000)")  # with thanks to Pico
 
@@ -212,10 +212,28 @@ The user account does not have a secure token. Please contact your administrator
 			exit 1
 		fi
 	fi
-	
-	adminpswd=$(osascript -e 'Tell application "System Events" to display dialog "To install the available macOS updates please enter your password" buttons {"Continue"} default button 1 with title "macOS Updates" with icon alias "System:Applications:Utilities:Keychain Access.app:Contents:Resources:AppIcon.icns" with hidden answer default answer ""' -e 'text returned of result' 2>/dev/null)
+    
+# Get Password for updates
 
-	"$Notify" \
+	adminPswd=$(osascript -e 'Tell application "System Events" to display dialog "To install the available macOS updates please enter your password" buttons {"Continue"} default button 1 with title "macOS Upgrade" with icon alias "System:Applications:Utilities:Keychain Access.app:Contents:Resources:AppIcon.icns" with hidden answer default answer ""' -e 'text returned of result' 2>/dev/null)
+	
+    pswdCheck=$(dscl /Local/Default -authonly $CURRENT_USER $adminPswd)
+		
+		until [[ $pswdCheck == "" ]]
+		do
+			echo "Password was incorrect"
+	adminPswd=$(osascript -e 'Tell application "System Events" to display dialog "Password is incorrect. Please try again." buttons {"Continue"} default button 1 with title "macOS Upgrade" with icon alias "System:Applications:Utilities:Keychain Access.app:Contents:Resources:AppIcon.icns" with hidden answer default answer ""' -e 'text returned of result' 2>/dev/null)
+			
+			pswdCheck=$(dscl /Local/Default -authonly $CURRENT_USER $adminPswd)
+			echo $pswdCheck
+		done
+		
+		echo "Password Validation passed. Continuing Updates....."
+    sleep 5
+    
+# Run Updates
+    
+    "$Notify" \
 	-windowType hud \
 	-lockHUD \
 	-title "MacOS Updates" \
@@ -225,7 +243,15 @@ This process can take 20-60min so please do not turn off your device during this
 Once the update is downloaded and ready to install your device will reboot so please save any open work." \
 	-icon /System/Library/PreferencePanes/SoftwareUpdate.prefPane/Contents/Resources/SoftwareUpdate.icns &
 	
-	softwareupdate --install --all --agree-to-license --restart --force --user "$CURRENT_USER" --stdinpass "$adminPswd" &
+	expect -c "
+		set timeout -1
+		spawn softwareupdate --install --all --restart --force --no-scan --agree-to-license
+		expect \"Password:\"
+		send {${adminPswd}}
+		send \r
+		expect eof
+		wait
+		"
 else
 	echo "Mac is Intel"
 	
@@ -239,5 +265,5 @@ This process can take 20-60min so please do not turn off your device during this
 Once the update is downloaded and ready to install your device will reboot so please save any open work." \
 	-icon /System/Library/PreferencePanes/SoftwareUpdate.prefPane/Contents/Resources/SoftwareUpdate.icns &
 	
-	softwareupdate --install --all --agree-to-license --restart --force &
+	softwareupdate --install --all --agree-to-license --restart --force
 fi
