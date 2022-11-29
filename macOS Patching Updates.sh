@@ -123,6 +123,36 @@ fi
 deferment
 
 ##############################################################
+# Check Battery state
+##############################################################
+
+bat=$(pmset -g batt | grep 'AC Power')
+
+model=$(ioreg -l | awk '/product-name/ { split($0, line, "\""); printf("%s\n", line[4]); }')
+
+if [[ "$model" = *"Book"* ]]; then
+	until [[ $bat == "Now drawing from 'AC Power'" ]]; do
+	
+	echo "Device not connected to power source"
+	
+	"$Notify" \
+		-windowType hud \
+		-lockHUD \
+		-title "MacOS Updates" \
+		-heading "Connect Charger" \
+		-description "Please connect your device to a charger to continue installing updates." \
+		-icon /System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/AlertStopIcon.icns \
+		-button1 "Continue" \
+		-defaultButton 1 \
+	
+		bat=$(pmset -g batt | grep 'AC Power')
+		sleep 2
+	done
+fi
+
+echo "Device connected to power source"
+
+##############################################################
 # Run software update
 ##############################################################
 
