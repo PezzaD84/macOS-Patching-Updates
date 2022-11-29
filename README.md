@@ -6,3 +6,4 @@ Updates are triggered by the local softwareupdate command on M1 and Intel macs. 
 
 Updates and new features are listed in the change log.
 
+If you are liking the work then help me stay awake to carry on writing by buying me a coffee ☕️ https://www.buymeacoffee.com/pezza
