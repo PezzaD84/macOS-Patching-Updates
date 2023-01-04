@@ -281,7 +281,7 @@ Once the update is downloaded and ready to install your device will reboot so pl
 		send \r
 		expect eof
 		wait
-		"
+		" > /dev/null
 else
 	echo "Mac is Intel"
 	
